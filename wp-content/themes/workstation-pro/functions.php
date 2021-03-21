@@ -43,7 +43,7 @@ include_once( get_stylesheet_directory() . '/lib/woocommerce/woocommerce-notice.
 // Child theme (do not remove).
 define( 'CHILD_THEME_NAME', __( 'Workstation Pro', 'workstation-pro' ) );
 define( 'CHILD_THEME_URL', 'http://my.studiopress.com/themes/workstation/' );
-define( 'CHILD_THEME_VERSION', '1.1.3' );
+define( 'CHILD_THEME_VERSION', '1.1.5' );
 
 // Enqueue scripts and styles.
 add_action( 'wp_enqueue_scripts', 'workstation_enqueue_scripts_styles' );
@@ -92,11 +92,31 @@ add_theme_support( 'genesis-responsive-viewport' );
 // Add support for custom header.
 add_theme_support( 'custom-header', array(
 	'flex-height'     => true,
-	'width'           => 600,
-	'height'          => 120,
+	'width'           => 0,
+	'height'          => 0,
 	'header-selector' => '.site-title a',
 	'header-text'     => false,
 ) );
+
+function genesischild_swap_header( $title, $inside, $wrap ) {
+	// Set what goes inside the wrapping tags.
+	if ( get_header_image() ) :
+		$logo = '<img  src="' . get_header_image() . '" width="' . esc_attr( get_custom_header()->width ) . '" height="' . esc_attr( get_custom_header()->height ) . '" alt="' . esc_attr( get_bloginfo( 'name' ) ) . '">';
+	else :
+		$logo = get_bloginfo( 'name' );
+	endif;
+		 $inside = sprintf( '<a href="%s" title="%s">%s</a>', trailingslashit( home_url() ), esc_attr( get_bloginfo( 'name' ) ), $logo );
+		 // Determine which wrapping tags to use - changed is_home to is_front_page to fix Genesis bug.
+		 $wrap = is_front_page() && 'title' === genesis_get_seo_option( 'home_h1_on' ) ? 'h1' : 'p';
+		 // A little fallback, in case an SEO plugin is active - changed is_home to is_front_page to fix Genesis bug.
+		 $wrap = is_front_page() && ! genesis_get_seo_option( 'home_h1_on' ) ? 'h1' : $wrap;
+		 // And finally, $wrap in h1 if HTML5 & semantic headings enabled.
+		 $wrap = genesis_html5() && genesis_get_seo_option( 'semantic_headings' ) ? 'h1' : $wrap;
+		 $title = sprintf( '<%1$s %2$s>%3$s</%1$s>', $wrap, genesis_attr( 'site-title' ), $inside );
+		 return $title;
+}
+add_filter( 'genesis_seo_title','genesischild_swap_header', 10, 3 );
+
 
 // Add support for structural wraps.
 add_theme_support( 'genesis-structural-wraps', array(
@@ -176,8 +196,8 @@ function workstation_featured_photo() {
 		return;
 	}
 
-	if ( is_singular() && $image = genesis_get_image( array( 'format' => 'url', 'size' => genesis_get_option( 'image_size' ) ) ) ) {
-		printf( '<div class="featured-image"><img src="%s" alt="%s" class="entry-image"/></div>', $image, the_title_attribute( 'echo=0' ) );
+	if ( is_singular() && is_single() && $image = genesis_get_image( array( 'format' => 'url', 'size' => genesis_get_option( 'image_size' ) ) ) ) {
+		//printf( '<div class="featured-image"><img src="%s" alt="%s" class="entry-image"/></div>', $image, the_title_attribute( 'echo=0' ) );
 	}
 
 }
@@ -224,13 +244,13 @@ function workstation_page_description_meta() {
 		add_action( 'genesis_after_header', 'workstation_close_after_header', 15 );
 	}
 
-	elseif ( is_singular() && is_page() && has_excerpt() ) {
+/*	elseif ( is_singular() && is_page() && has_excerpt() ) {
 		remove_action( 'genesis_entry_header', 'genesis_do_post_title' );
 		add_action( 'genesis_after_header', 'workstation_open_after_header', 5 );
 		add_action( 'genesis_after_header', 'workstation_add_page_description', 10 );
 		add_action( 'genesis_after_header', 'workstation_close_after_header', 15 );
 	}
-
+*/
 }
 
 // Output the page title and description.
@@ -325,3 +345,140 @@ genesis_register_sidebar( array(
 	'name'        => __( 'Flexible Footer', 'workstation-pro' ),
 	'description' => __( 'This is the footer section.', 'workstation-pro' ),
 ) );
+
+add_filter('woocommerce_add_to_cart_redirect', 'themeprefix_add_to_cart_redirect');
+function themeprefix_add_to_cart_redirect() {
+ global $woocommerce;
+ $checkout_url = wc_get_checkout_url();
+ return $checkout_url;
+}
+remove_action( 'woocommerce_before_single_product_summary', 'woocommerce_show_product_images', 20 );
+add_filter( 'wc_add_to_cart_message_html', '__return_false' );
+add_filter( 'woocommerce_order_button_text', 'woo_custom_order_button_text' ); 
+
+function woo_custom_order_button_text() {
+    return __( 'Process Payment', 'woocommerce' ); 
+}
+
+/**
+ * @snippet       WooCommerce Only one product in cart
+ * @how-to        Watch tutorial @ https://businessbloomer.com/?p=19055
+ * @sourcecode    https://businessbloomer.com/?p=560
+ * @author        Rodolfo Melogli
+ * @testedwith    WooCommerce 3.4.3
+ */
+ 
+add_filter( 'woocommerce_add_to_cart_validation', 'bbloomer_only_one_in_cart', 99, 2 );
+  
+function bbloomer_only_one_in_cart( $passed, $added_product_id ) {
+ 
+// empty cart first: new item will replace previous
+wc_empty_cart();
+ 
+// display a message if you like
+//wc_add_notice( 'New product added to cart!', 'notice' );
+ 
+return $passed;
+}
+
+
+/*to let is upload svgs */
+
+add_filter( 'wp_check_filetype_and_ext', function($data, $file, $filename, $mimes) {
+
+global $wp_version; if( $wp_version == '4.7' || ( (float) $wp_version < 4.7 ) ) { return $data; }
+
+$filetype = wp_check_filetype( $filename, $mimes );
+
+return [ 'ext' => $filetype['ext'], 'type' => $filetype['type'], 'proper_filename' => $data['proper_filename'] ];
+
+}, 10, 4 );
+
+function cc_mime_types( $mimes ){ $mimes['svg'] = 'image/svg+xml'; return $mimes; } add_filter( 'upload_mimes', 'cc_mime_types' );
+
+/*function fix_svg() { echo ' .attachment-266x266, .thumbnail img { width: 100% !important; height: auto !important; } '; } add_action( 'admin_head', 'fix_svg' );*/
+
+//* Change the footer text
+add_filter('genesis_footer_creds_text', 'sp_footer_creds_filter');
+function sp_footer_creds_filter( $creds ) {
+	$creds = '[footer_copyright] &middot; INVICTA LAW CORPORATION';
+	return $creds;
+}
+
+//* Remove the site description
+add_filter( 'genesis_attr_site-description', 'genesis_attributes_screen_reader_class' );
+
+
+//* Add extra CSS classes to animate the site-container
+add_filter('genesis_attr_site-container', 'ig_animate_site_container');
+function ig_animate_site_container($attributes) {
+
+    $attributes['class'] .= ' animate-site-container fadeIn';
+    return $attributes;
+
+}
+
+/* allow shortcodes in widgets */
+add_filter( 'widget_text', 'do_shortcode' );
+
+add_action( 'wp_enqueue_scripts', 'event_tracking' );
+function event_tracking() {
+    wp_enqueue_script( 'follow', get_stylesheet_directory_uri() . '/js/eventtracking.js', array( 'jquery' ), '', true );
+}
+
+// Add Read More Link to Excerpts
+
+add_filter('excerpt_more', 'get_read_more_link');
+
+add_filter( 'the_content_more_link', 'get_read_more_link' );
+
+function get_read_more_link() {
+
+   return '<a href="' . get_permalink() . '">[Read More]</a>';
+
+}
+
+//* Modify breadcrumb arguments.
+add_filter( 'genesis_breadcrumb_args', 'sp_breadcrumb_args' );
+function sp_breadcrumb_args( $args ) {
+	$args['home'] = 'Home';
+	$args['sep'] = ' / ';
+	$args['list_sep'] = ', '; // Genesis 1.5 and later
+	$args['prefix'] = '<div class="breadcrumb">';
+	$args['suffix'] = '</div>';
+	$args['heirarchial_attachments'] = true; // Genesis 1.5 and later
+	$args['heirarchial_categories'] = true; // Genesis 1.5 and later
+	$args['display'] = true;
+	$args['labels']['prefix'] = '';
+	$args['labels']['author'] = 'Archives for ';
+	$args['labels']['category'] = 'Archives for '; // Genesis 1.6 and later
+	$args['labels']['tag'] = 'Archives for ';
+	$args['labels']['date'] = 'Archives for ';
+	$args['labels']['search'] = 'Search for ';
+	$args['labels']['tax'] = 'Archives for ';
+	$args['labels']['post_type'] = 'Archives for ';
+	$args['labels']['404'] = 'Not found: '; // Genesis 1.5 and later
+return $args;
+}
+
+//* Remove breadcrumb from a single page
+//* https://codex.wordpress.org/Function_Reference/is_page
+function b3m_remove_genesis_breadcrumb() {
+  if ( is_page( array('about','immigration-law','family-law','corporate-law','notary-public-vancouver', 'contact') ) ) {
+    remove_action( 'genesis_before_loop', 'genesis_do_breadcrumbs' );
+  }
+}
+add_action( 'genesis_before', 'b3m_remove_genesis_breadcrumb' );
+
+function jetpackme_no_related_posts( $options ) {
+    if (
+        is_single(
+            array( 6552, 1 )
+        )
+    ) {
+        $options['enabled'] = false;
+    }
+ 
+    return $options;
+}
+add_filter( 'jetpack_relatedposts_filter_options', 'jetpackme_no_related_posts' );
